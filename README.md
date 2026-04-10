@@ -113,7 +113,7 @@ Copy the **public key** and **token**.
 mkdir -p /home/ubuntu/beszel-agent
 ```
 
-Create a `docker-compose.yml` with **only the agent**:
+Create a `docker-compose.yml` with **only the agent**: (Same structure as what you got for the first setup)
 
 ```yaml
 services:
@@ -144,7 +144,7 @@ The new system should appear green in the hub dashboard.
 
 1. Go to **Settings** → **Notifications** in the Beszel UI
 2. Add URL: `telegram://BOT_TOKEN@telegram?chats=CHAT_ID`
-3. Go to the **Systems** table → click your system → **Alerts** tab
+3. Go to the **Systems** table → locate your system → **Alerts** icon on the row
 4. Enable alerts for CPU, memory, disk, status, etc.
 
 ## Useful commands
