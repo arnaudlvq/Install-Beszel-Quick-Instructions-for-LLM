@@ -43,6 +43,8 @@ services:
       - no-new-privileges:true
     environment:
       - APP_URL=https://status.example.com
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - beszel-data:/beszel_data
     labels:
@@ -82,7 +84,7 @@ ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d beszel'
 2. Create your admin account
 3. Click **Add System**:
    - **Name**: your server name (e.g. `my-vps`)
-   - **Host**: `localhost`
+   - **Host**: `host.docker.internal`
    - **Port**: `45876` (given)
 4. Copy the **docker-compose.yml** shown in the dialog
 
