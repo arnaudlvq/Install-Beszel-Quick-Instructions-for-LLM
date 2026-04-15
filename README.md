@@ -73,9 +73,18 @@ networks:
 
 ### 3. Deploy the hub
 
+First boot **without** `user:` so the hub generates its SSH key as root, then fix ownership and redeploy as non-root:
+
 ```bash
 scp docker-compose.yml your-vps:/home/ubuntu/beszel/
-ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d beszel'
+# Step 1: start once as root to generate the key
+ssh your-vps 'cd /home/ubuntu/beszel && \
+  docker compose run --rm --user root beszel true; \
+  docker compose up -d beszel'
+# Step 2: fix volume ownership, then redeploy non-root
+ssh your-vps 'docker stop beszel && \
+  docker run --rm -v beszel-data:/data alpine chown -R 65534:65534 /data && \
+  cd /home/ubuntu/beszel && docker compose up -d beszel'
 ```
 
 ### 4. Create admin account + add system
@@ -84,7 +93,7 @@ ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d beszel'
 2. Create your admin account
 3. Click **Add System**:
    - **Name**: your server name (e.g. `my-vps`)
-   - **Host**: `host.docker.internal`
+   - **Host**: `localhost`
    - **Port**: `45876` (given)
 4. Copy the **docker-compose.yml** shown in the dialog
 
@@ -102,20 +111,20 @@ Get the docker group GID: `getent group docker | cut -d: -f3` (e.g. `988`), then
 
 ```yaml
   beszel-agent:
-    image: henrygd/beszel-agent:0.18.7 # version important
-        container_name: beszel-agent
-        restart: unless-stopped
-        network_mode: host
-        user: "65534:988"  # nobody:docker — replace 988 with your docker GID
-        security_opt:
-            - no-new-privileges:true # important
-
-
+    image: henrygd/beszel-agent:0.18.7
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:988"  # nobody:docker — replace 988 with your docker GID
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-    ...
+      LISTEN: 127.0.0.1:45876  # loopback only — agent and hub on same server
       KEY: ${BESZEL_AGENT_KEY}
       TOKEN: ${BESZEL_AGENT_TOKEN}
-      ...
+      HUB_URL: https://status.example.com
 ```
 
 ### 6. Deploy the agent
@@ -123,8 +132,6 @@ Get the docker group GID: `getent group docker | cut -d: -f3` (e.g. `988`), then
 ```bash
 scp docker-compose.yml your-vps:/home/ubuntu/beszel/
 scp .env your-vps:/home/ubuntu/beszel/
-# Fix volume ownership for non-root hub (run once)
-ssh your-vps 'docker run --rm -v beszel-data:/data alpine chown -R 65534:65534 /data'
 ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d'
 ```
 
