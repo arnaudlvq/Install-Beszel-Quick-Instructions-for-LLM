@@ -38,12 +38,20 @@ services:
     image: henrygd/beszel:0.18.7
     container_name: beszel
     restart: unless-stopped
+    user: "65534:65534"
+    security_opt:
+      - no-new-privileges:true
     environment:
       - APP_URL=https://status.example.com
     volumes:
       - beszel-data:/beszel_data
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.beszel-http.rule=Host(`status.example.com`)"
+      - "traefik.http.routers.beszel-http.entrypoints=web"
+      - "traefik.http.routers.beszel-http.middlewares=beszel-https"
+      - "traefik.http.middlewares.beszel-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.beszel-https.redirectscheme.permanent=true"
       - "traefik.http.routers.beszel.rule=Host(`status.example.com`)"
       - "traefik.http.routers.beszel.entrypoints=websecure"
       - "traefik.http.routers.beszel.tls.certresolver=letsencrypt"
@@ -80,12 +88,41 @@ ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d beszel'
 
 ### 5. Add the agent to `docker-compose.yml`
 
-Add the agent service with the key and token from step 4: paste the peice of yml code you just copied.
+Create a `.env` file next to your `docker-compose.yml` with the key and token from step 4:
+
+```bash
+# .env  (never commit this)
+BESZEL_AGENT_KEY=ssh-ed25519 AAAA...
+BESZEL_AGENT_TOKEN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Get the docker group GID: `getent group docker | cut -d: -f3` (e.g. `988`), then add the agent service:
+
+```yaml
+  beszel-agent:
+    image: henrygd/beszel-agent:0.18.7 # version important
+        container_name: beszel-agent
+        restart: unless-stopped
+        network_mode: host
+        user: "65534:988"  # nobody:docker — replace 988 with your docker GID
+        security_opt:
+            - no-new-privileges:true # important
+
+
+    environment:
+    ...
+      KEY: ${BESZEL_AGENT_KEY}
+      TOKEN: ${BESZEL_AGENT_TOKEN}
+      ...
+```
 
 ### 6. Deploy the agent
 
 ```bash
 scp docker-compose.yml your-vps:/home/ubuntu/beszel/
+scp .env your-vps:/home/ubuntu/beszel/
+# Fix volume ownership for non-root hub (run once)
+ssh your-vps 'docker run --rm -v beszel-data:/data alpine chown -R 65534:65534 /data'
 ssh your-vps 'cd /home/ubuntu/beszel && docker compose up -d'
 ```
 
@@ -115,6 +152,14 @@ mkdir -p /home/ubuntu/beszel-agent
 
 Create a `docker-compose.yml` with **only the agent**: (Same structure as what you got for the first setup)
 
+Create a `.env` with the key and token, then a `docker-compose.yml`:
+
+```bash
+# .env
+BESZEL_AGENT_KEY=ssh-ed25519 AAAA...
+BESZEL_AGENT_TOKEN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
 ```yaml
 services:
   beszel-agent:
@@ -122,13 +167,16 @@ services:
     container_name: beszel-agent
     restart: unless-stopped
     network_mode: host
+    user: "65534:988"  # nobody:docker — replace 988 with your docker GID
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      LISTEN: 45876
-      KEY: "ssh-ed25519 AAAA... (public key from hub)"
-      TOKEN: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-      HUB_URL: "https://status.example.com"
+      LISTEN: 45876  # exposed to hub — open in firewall if needed
+      KEY: ${BESZEL_AGENT_KEY}
+      TOKEN: ${BESZEL_AGENT_TOKEN}
+      HUB_URL: https://status.example.com
 ```
 
 ```bash
