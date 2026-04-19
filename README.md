@@ -222,3 +222,15 @@ ssh your-vps 'cd /home/ubuntu/beszel && docker compose pull && docker compose up
 # Full reset (loses all data)
 ssh your-vps 'cd /home/ubuntu/beszel && docker compose down -v'
 ```
+
+
+
+
+RESET ACCESS :
+
+```
+ssh applidia "cd /home/ubuntu/beszel && docker compose down && docker compose up -d && docker compose ps"
+```
+```
+docker restart beszel
+```
